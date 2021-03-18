@@ -22,6 +22,9 @@ clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 clientSocket.connect((serverName, serverPort))
 
+serverMessage = ""
+message = ""
+
 def keyboard_interrupt_handler(signal, frame):
     print("\r[SHUTDOWN] Connection to server has been closed.")
     clientSocket.close()
@@ -29,41 +32,59 @@ def keyboard_interrupt_handler(signal, frame):
 
 def recv_handler():
     global clientSocket
+    global serverMessage
+    global message
     while True:
         try:
             # Receive Message From Server
-            message = clientSocket.recv(1024).decode()
-            if message == 'PROMPT_COMMANDS':
-                reply = input("PROMPT_COMMANDS: ")
-                clientSocket.send(reply.encode('utf-8'))
-            else:
-                print(message)
+            serverMessage = clientSocket.recv(1024).decode()     
+            print(serverMessage)
         except:
             # Close Connection When Error
-            print("An error occured!")
             clientSocket.close()
             break
 
 def send_handler():
     global clientSocket
+    global serverMessage
+    global message
     while True:
-        message = '{}: {}'.format(username, input(''))
-        clientSocket.send(message.encode())
+        try:
+            message = input("> ").strip()
+            clientSocket.send(message.encode())
+        except:
+            clientSocket.close()
+            break
 
 def start():
+    print("Welcome to Toom!")
     recv_thread = threading.Thread(target=recv_handler)
     recv_thread.daemon = True
     recv_thread.start()
 
     send_thread = threading.Thread(target=send_handler)
-    send_thread.daemon = True
+    send_thread.daemon = False
     send_thread.start()
-
-    signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
     while True:
         time.sleep(0.1)
 
 def login():
-    pass
-start()
+    global clientSocket
+    clientSocket.send(username.encode('utf-8'))
+    clientSocket.send(input("Password: ").encode('utf-8'))
+    while True:
+        try:
+            login_result = clientSocket.recv(1024).decode('utf-8')
+            if login_result == 'SUCCESS':
+                start()
+                break
+            elif login_result == 'INCORRECT_PASSWORD':
+                print("Invalid Password. Please try again")
+                clientSocket.send(input("Password: ").encode('utf-8'))
+        except:
+            clientSocket.close()
+            break
+
+signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+login()

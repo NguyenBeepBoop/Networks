@@ -61,25 +61,54 @@ def broadcast(message):
     for client in CURRENT_USERS:
         client.send(message)
 
+def prompt_commands(client, username):
+    while True:
+        try:
+            client.send('PROMPT_COMMANDS'.encode('utf-8'))
+            message = client.recv(1024)
+            broadcast(message)
+        except:
+            print(f'{username} has disconnected')
+            broadcast('{username} has left the chat!'.encode('utf-8'))
+            client.exit()
+
 def prompt_login(client):
     global CURRENT_USERS
     global logins
-    
+    global t_lock
+    with t_lock:
+        username = client.recv(1024).decode('utf-8')
+        
+        login_attempts = 1
+        while login_attempts < ATTEMPTS:
+            password = client.recv(1024).decode()
+            if logins[username] != password:  
+                client.send('INCORRECT_PASSWORD'.encode('utf-8'))
+                login_attempts += 1
+            elif logins[username] == password:
+                print(f'{username} has sucessfully logged in.')
+                client.send('SUCCESS'.encode('utf-8'))
+                CURRENT_USERS.append(client)
+                t_lock.notify()
+                return (True, username)
+        t_lock.notify()
+        return (False, username)
+
 def client_handler(client):
     global t_lock
     global CURRENT_USERS
     global serverSocket
-    while True:
-        try:
-            login_status = prompt_login(client)
-        except:
-            client_exit(client)
+    try:
+        login_status = prompt_login(client)
+        if login_status[0]:
+            prompt_commands(client, login_status[1])
+    except:
+        client_exit(client)
 
 def recv_handler():
     global serverSocket
     while True:
         client, addr = serverSocket.accept()
-        CURRENT_USERS.append(client)
         print(f'[CONNECTION] connected with address {str(addr)}')
         client_thread = threading.Thread(target=client_handler, args=(client,))
         client_thread.start()

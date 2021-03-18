@@ -50,15 +50,20 @@ def send_handler():
         message = '{}: {}'.format(username, input(''))
         clientSocket.send(message.encode())
 
-recv_thread = threading.Thread(target=recv_handler)
-recv_thread.daemon = True
-recv_thread.start()
+def start():
+    recv_thread = threading.Thread(target=recv_handler)
+    recv_thread.daemon = True
+    recv_thread.start()
 
-send_thread = threading.Thread(target=send_handler)
-send_thread.daemon = True
-send_thread.start()
+    send_thread = threading.Thread(target=send_handler)
+    send_thread.daemon = True
+    send_thread.start()
 
-signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+    signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
-while True:
-    time.sleep(0.1)
+    while True:
+        time.sleep(0.1)
+
+def login():
+    pass
+start()

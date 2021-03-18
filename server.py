@@ -71,8 +71,7 @@ def client_handler(client):
     global serverSocket
     while True:
         try:
-            message = client.recv(1024)
-            broadcast(message)
+            login_status = prompt_login(client)
         except:
             client_exit(client)
 

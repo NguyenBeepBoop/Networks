@@ -28,7 +28,7 @@ try:
     if ATTEMPTS > 5 or ATTEMPTS < 1:
         print("Attempts must be between 1 and 5")
 except:
-    print("Usage: Python3 WebServer.py <PORT> <ATTEMPTS>")
+    print("Usage: Python3 server.py <PORT> <ATTEMPTS>")
     sys.exit(1)
 
 serverSocket = socket(AF_INET, SOCK_STREAM)
@@ -65,14 +65,14 @@ def prompt_login(client):
     global CURRENT_USERS
     global logins
     
-
 def client_handler(client):
     global t_lock
     global CURRENT_USERS
     global serverSocket
     while True:
         try:
-            login_status = prompt_login(client)
+            message = client.recv(1024)
+            broadcast(message)
         except:
             client_exit(client)
 
@@ -80,6 +80,7 @@ def recv_handler():
     global serverSocket
     while True:
         client, addr = serverSocket.accept()
+        CURRENT_USERS.append(client)
         print(f'[CONNECTION] connected with address {str(addr)}')
         client_thread = threading.Thread(target=client_handler, args=(client,))
         client_thread.start()

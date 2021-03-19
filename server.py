@@ -61,6 +61,8 @@ def broadcast(message):
     for client in CURRENT_USERS:
         client.send(message)
 
+def block():
+    pass
 def prompt_commands(client, username):
     while True:
         try:
@@ -70,15 +72,20 @@ def prompt_commands(client, username):
         except:
             print(f'{username} has disconnected')
             broadcast('{username} has left the chat!'.encode('utf-8'))
-            client.exit()
+            client_exit()
 
 def prompt_login(client):
     global CURRENT_USERS
     global logins
     global t_lock
     with t_lock:
-        username = client.recv(1024).decode('utf-8')
-        
+        while True:
+            username = client.recv(1024).decode('utf-8')
+            if username in logins:
+                client.send('VALID_USERNAME'.encode('utf-8'))
+                break
+            else:
+                client.send('INVALID_USERNAME'.encode('utf-8'))
         login_attempts = 1
         while login_attempts < ATTEMPTS:
             password = client.recv(1024).decode()

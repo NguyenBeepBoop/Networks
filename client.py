@@ -16,8 +16,6 @@ else:
     print("usage: python3 client.py <serverAddress> <serverPort>")
     sys.exit(1)
 
-username = input("Username: ")
-
 clientSocket = socket(AF_INET, SOCK_STREAM)
 clientSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 clientSocket.connect((serverName, serverPort))
@@ -37,8 +35,12 @@ def recv_handler():
     while True:
         try:
             # Receive Message From Server
-            serverMessage = clientSocket.recv(1024).decode()     
-            print(serverMessage)
+            serverMessage = clientSocket.recv(1024).decode('utf-8')
+            print("> ", end="")    
+            if serverMessage == 'PROMPT_COMMANDS':
+                print("Enter one of thefollowing commands (MSG, DLT, EDT, RDM, ATU, OUT):", end=" ")
+            else:
+                print(message)
         except:
             # Close Connection When Error
             clientSocket.close()
@@ -49,9 +51,12 @@ def send_handler():
     global serverMessage
     global message
     while True:
+        time.sleep(0.1)
         try:
-            message = input("> ").strip()
-            clientSocket.send(message.encode())
+            if serverMessage == 'PROMPT_COMMANDS':
+                message = input("")
+            clientSocket.send(message.encode('utf-8'))
+
         except:
             clientSocket.close()
             break
@@ -59,7 +64,7 @@ def send_handler():
 def start():
     print("Welcome to Toom!")
     recv_thread = threading.Thread(target=recv_handler)
-    recv_thread.daemon = True
+    recv_thread.daemon = False
     recv_thread.start()
 
     send_thread = threading.Thread(target=send_handler)
@@ -71,7 +76,13 @@ def start():
 
 def login():
     global clientSocket
-    clientSocket.send(username.encode('utf-8'))
+    while True:
+        clientSocket.send(input("Username: ").encode('utf-8'))
+        usernameStatus = clientSocket.recv(1024).decode('utf-8')
+        if usernameStatus == 'INVALID_USERNAME':
+            print("Please enter a valid username.")
+        elif usernameStatus == 'VALID_USERNAME':
+            break
     clientSocket.send(input("Password: ").encode('utf-8'))
     while True:
         try:

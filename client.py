@@ -90,6 +90,14 @@ def login():
             if login_result == 'SUCCESS':
                 start()
                 break
+            elif login_result == 'ALREADY_LOGGED':
+                print("> This account is already logged in.")
+                clientSocket.close()
+                sys.exit(1)
+            elif login_result == 'BLOCKED':
+                print("> Your account is blocked due to multiple login failures. Please try again later")
+                clientSocket.close()
+                sys.exit(1)
             elif login_result == 'BLOCK_LOGIN':
                 print("> Invalid Password. Your account has been blocked. Please try again later")
                 clientSocket.close()

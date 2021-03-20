@@ -13,8 +13,10 @@ IP = 'localhost'
 timeout = False
 t_lock=threading.Condition()
 block_time = 10
-
+message = ""
 CURRENT_USERS = []
+
+USERNAMES = []
 
 BLOCKED_CLIENTS = {}
 
@@ -50,20 +52,37 @@ def keyboard_interrupt_handler(signal, frame):
     exit(0)
 
 def populate_logins():
+    global BLOCKED_CLIENTS
     user_logins = {}
     with open("credentials.txt", 'r') as file:
         for line in file:
             (username, password) = line.split()
             user_logins[username] = password
+            BLOCKED_CLIENTS[username] = False
     return user_logins
 
 def broadcast(message):
     for client in CURRENT_USERS:
         client.send(message)
 
-def block():
-    pass
+def block(username, client, client_ip, client_port):
+    global BLOCKED_CLIENTS
+    global block_time
+    print(f"[BLOCK] Blocked access from {username}, IP: {client_ip}, PORT: {client_port}")
+    BLOCKED_CLIENTS[username] = True
+    
+
+def is_blocked(username):
+    global BLOCKED_CLIENTS
+    return BLOCKED_CLIENTS[username]
+
+def unblock(username):
+    global BLOCKED_CLIENTS
+    print(f"[BLOCK] Unblocked {username}")
+    BLOCKED_CLIENTS[username] = False
+
 def prompt_commands(client, username):
+    global message
     while True:
         try:
             client.send('PROMPT_COMMANDS'.encode('utf-8'))
@@ -89,17 +108,29 @@ def prompt_login(client):
         login_attempts = 1
         while login_attempts < ATTEMPTS:
             password = client.recv(1024).decode()
+            if is_blocked(username):
+                    client.send('BLOCKED'.encode('utf-8'))
+                    client.close()
             if logins[username] != password:  
                 client.send('INCORRECT_PASSWORD'.encode('utf-8'))
                 login_attempts += 1
             elif logins[username] == password:
-                print(f'{username} has sucessfully logged in.')
-                client.send('SUCCESS'.encode('utf-8'))
-                CURRENT_USERS.append(client)
-                t_lock.notify()
-                return (True, username)
+                if username in USERNAMES:
+                    client.send('ALREADY_LOGGED'.encode('utf-8'))
+                    client.close()
+                else:
+                    login(client, username)
+                    return (True, username)
         t_lock.notify()
         return (False, username)
+
+def login(client, username):
+    global CURRENT_USERS
+    global USERNAMES
+    client.send('SUCCESS'.encode('utf-8'))
+    CURRENT_USERS.append(client)
+    USERNAMES.append(username)
+    t_lock.notify()
 
 def client_handler(client, addr):
     global t_lock
@@ -113,7 +144,9 @@ def client_handler(client, addr):
             prompt_commands(client, login_status[1])
         else:
             client.send('BLOCK_LOGIN'.encode('utf-8'))
-            print(f"Blocked access from {login_status[1]}, IP: {client_ip}, PORT: {client_port}")
+            block(login_status[1], client, client_ip, client_port)
+            threading.Timer(block_time, unblock, [login_status[1]]).start()
+            client.close()
     except:
         client.close()
 
@@ -129,10 +162,11 @@ def send_handler():
     global t_lock
     global CURRENT_USERS
     global serverSocket
+    global message
     while True:
         # get lock
         with t_lock:
-         
+            
             t_lock.notify()
 
 logins = populate_logins()

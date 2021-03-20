@@ -101,23 +101,28 @@ def prompt_login(client):
         t_lock.notify()
         return (False, username)
 
-def client_handler(client):
+def client_handler(client, addr):
     global t_lock
     global CURRENT_USERS
     global serverSocket
+    client_ip = addr[0]
+    client_port = addr[1]
     try:
         login_status = prompt_login(client)
         if login_status[0]:
             prompt_commands(client, login_status[1])
+        else:
+            client.send('BLOCK_LOGIN'.encode('utf-8'))
+            print(f"Blocked access from {login_status[1]}, IP: {client_ip}, PORT: {client_port}")
     except:
-        client_exit(client)
+        client.close()
 
 def recv_handler():
     global serverSocket
     while True:
         client, addr = serverSocket.accept()
         print(f'[CONNECTION] connected with address {str(addr)}')
-        client_thread = threading.Thread(target=client_handler, args=(client,))
+        client_thread = threading.Thread(target=client_handler, args=(client, addr))
         client_thread.start()
 
 def send_handler():

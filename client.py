@@ -77,22 +77,26 @@ def start():
 def login():
     global clientSocket
     while True:
-        clientSocket.send(input("Username: ").encode('utf-8'))
+        clientSocket.send(input("> Username: ").encode('utf-8'))
         usernameStatus = clientSocket.recv(1024).decode('utf-8')
         if usernameStatus == 'INVALID_USERNAME':
-            print("Please enter a valid username.")
+            print("> Please enter a valid username.")
         elif usernameStatus == 'VALID_USERNAME':
             break
-    clientSocket.send(input("Password: ").encode('utf-8'))
+    clientSocket.send(input("> Password: ").encode('utf-8'))
     while True:
         try:
             login_result = clientSocket.recv(1024).decode('utf-8')
             if login_result == 'SUCCESS':
                 start()
                 break
+            elif login_result == 'BLOCK_LOGIN':
+                print("> Invalid Password. Your account has been blocked. Please try again later")
+                clientSocket.close()
+                sys.exit(1)
             elif login_result == 'INCORRECT_PASSWORD':
-                print("Invalid Password. Please try again")
-                clientSocket.send(input("Password: ").encode('utf-8'))
+                print("> Invalid Password. Please try again")
+                clientSocket.send(input("> Password: ").encode('utf-8'))
         except:
             clientSocket.close()
             break

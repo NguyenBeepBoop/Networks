@@ -20,6 +20,8 @@ USERNAMES = []
 
 BLOCKED_CLIENTS = {}
 
+MESSAGES = []
+
 # Get the server port and attempts allowed for login
 try:
     PORT = int(sys.argv[1])
@@ -37,21 +39,25 @@ serverSocket = socket(AF_INET, SOCK_STREAM)
 serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 serverSocket.bind((IP, PORT))
 
-##################################################
-def client_exit(client):
+######################################################
+def client_exit(client, username):
+    """ close the connection to the client and remove the client from current users """
+    global CURRENT_USERS
+    global USERNAMES
     global t_lock
     with t_lock:
-        for user in CURRENT_USERS:
-            if user == client:
-                CURRENT_USERS.remove(user)
+        CURRENT_USERS.remove(client)
+        USERNAMES.remove(username)
         client.close()
         t_lock.notify()
 
 def keyboard_interrupt_handler(signal, frame):
+    """ print a shutdown message if server is closed with CTRL+C """
     print("\r[SHUTDOWN] Server has been shutdown")
     exit(0)
 
 def populate_logins():
+    """ populate login data from credentials.txt to logins """ 
     global BLOCKED_CLIENTS
     user_logins = {}
     with open("credentials.txt", 'r') as file:
@@ -62,38 +68,52 @@ def populate_logins():
     return user_logins
 
 def broadcast(message):
+    """ function to broadcast message to all users """
     for client in CURRENT_USERS:
-        client.send(message)
+        client.send(message.encode())
 
+def send_message():
+    """ send the message to online users """
+    pass
+
+# Some blocking functions
 def block(username, client, client_ip, client_port):
+    """ function to block account (username) from being logged in. """
     global BLOCKED_CLIENTS
     global block_time
     print(f"[BLOCK] Blocked access from {username}, IP: {client_ip}, PORT: {client_port}")
     BLOCKED_CLIENTS[username] = True
-    
 
 def is_blocked(username):
+    """ returns true if user is currently blocked """
     global BLOCKED_CLIENTS
     return BLOCKED_CLIENTS[username]
 
 def unblock(username):
+    """ unblock the account(username) from the server """
     global BLOCKED_CLIENTS
     print(f"[BLOCK] Unblocked {username}")
     BLOCKED_CLIENTS[username] = False
 
 def prompt_commands(client, username):
+    """ prompt commands to user """
     global message
     while True:
         try:
             client.send('PROMPT_COMMANDS'.encode('utf-8'))
-            message = client.recv(1024)
-            broadcast(message)
+            message = client.recv(1024).decode()
+            message = message.split(maxsplit=1)
+            command = message[0]
+            if command == 'MSG':
+                send_message()
         except:
-            print(f'{username} has disconnected')
+            print(f'[CONNECTION] {username} has disconnected')
+            client_exit(client, username)
             broadcast('{username} has left the chat!'.encode('utf-8'))
-            client_exit()
+            break
 
 def prompt_login(client):
+    """" prompt user to login """
     global CURRENT_USERS
     global logins
     global t_lock
@@ -125,6 +145,7 @@ def prompt_login(client):
         return (False, username)
 
 def login(client, username):
+    """ login the user to the chat client """
     global CURRENT_USERS
     global USERNAMES
     client.send('SUCCESS'.encode('utf-8'))
@@ -133,6 +154,7 @@ def login(client, username):
     t_lock.notify()
 
 def client_handler(client, addr):
+    """ handles client interactions after receiving a connection """
     global t_lock
     global CURRENT_USERS
     global serverSocket
@@ -151,6 +173,7 @@ def client_handler(client, addr):
         client.close()
 
 def recv_handler():
+    """ handles incomming connections """ 
     global serverSocket
     while True:
         client, addr = serverSocket.accept()
@@ -159,6 +182,7 @@ def recv_handler():
         client_thread.start()
 
 def send_handler():
+    """ handles messaging for the server """
     global t_lock
     global CURRENT_USERS
     global serverSocket
@@ -169,6 +193,7 @@ def send_handler():
             
             t_lock.notify()
 
+""" Initialize the server """
 logins = populate_logins()
 
 print("[STARTING] server is starting...")

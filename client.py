@@ -38,8 +38,11 @@ def recv_handler():
             serverMessage = clientSocket.recv(1024).decode('utf-8')
             print("> ", end="")    
             if serverMessage == 'PROMPT_COMMANDS':
-                print("Enter one of thefollowing commands (MSG, DLT, EDT, RDM, ATU, OUT):", end=" ")
+                print("Enter one of the following commands (MSG, DLT, EDT, RDM, ATU, OUT):", end=" ")
+            elif serverMessage == 'INVALID_COMMAND':
+                print("Error. Invalid command!")
             else:
+                print("PRINTING")
                 print(message)
         except:
             # Close Connection When Error
@@ -55,8 +58,7 @@ def send_handler():
         try:
             if serverMessage == 'PROMPT_COMMANDS':
                 message = input("")
-            clientSocket.send(message.encode('utf-8'))
-
+                clientSocket.send(message.encode('utf-8'))
         except:
             clientSocket.close()
             break

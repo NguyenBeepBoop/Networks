@@ -68,11 +68,12 @@ def populate_logins():
     return user_logins
 
 def broadcast(message):
+    global CURRENT_USERS
     """ function to broadcast message to all users """
     for client in CURRENT_USERS:
         client.send(message.encode())
 
-def send_message():
+def send_message(client, username):
     """ send the message to online users """
     pass
 
@@ -105,7 +106,10 @@ def prompt_commands(client, username):
             message = message.split(maxsplit=1)
             command = message[0]
             if command == 'MSG':
-                send_message()
+                message = message[1]
+                broadcast(message)
+            else:
+                client.send('INVALID_COMMAND')
         except:
             print(f'[CONNECTION] {username} has disconnected')
             client_exit(client, username)

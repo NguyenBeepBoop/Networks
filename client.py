@@ -42,7 +42,7 @@ def recv_handler():
             elif serverMessage == 'INVALID_COMMAND':
                 print("Error. Invalid command!")
             else:
-                print(message)
+                print(serverMessage)
         except:
             # Close Connection When Error
             clientSocket.close()

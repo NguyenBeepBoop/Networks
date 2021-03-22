@@ -4,7 +4,7 @@ import sys
 from socket import *
 import threading
 import time
-import datetime
+from datetime import datetime
 import signal
 import json
 
@@ -39,6 +39,14 @@ serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 serverSocket.bind((IP, PORT))
 
 ######################################################
+# function to log interactions
+def log_connection(username, addr):
+    global USERNAMES
+    dt = datetime.now().strftime("%d %b %Y %H:%M:%S")
+    index = USERNAMES.index[username] + 1
+    log = f"{index}; {dt}; {addr}"
+    print(log)
+
 def client_exit(client, username):
     """ close the connection to the client and remove the client from current users """
     global CURRENT_USERS
@@ -66,9 +74,9 @@ def populate_logins():
             BLOCKED_CLIENTS[username] = False
     return user_logins
 
+# some functions for sending messages
 def broadcast(message):
     global CURRENT_USERS
-    print(message)
     """ function to broadcast message to all users """
     for client in CURRENT_USERS:
         client.send(message)
@@ -115,7 +123,7 @@ def prompt_commands(client, username):
             broadcast('{username} has left the chat!'.encode('utf-8'))
             break
 
-def prompt_login(client):
+def prompt_login(client, addr):
     """" prompt user to login """
     global CURRENT_USERS
     global logins
@@ -142,19 +150,19 @@ def prompt_login(client):
                     client.send('ALREADY_LOGGED'.encode('utf-8'))
                     client.close()
                 else:
-                    login(client, username)
+                    login(client, username, addr)
                     return (True, username)
         t_lock.notify()
         return (False, username)
 
-def login(client, username):
+def login(client, username, addr):
     """ login the user to the chat client """
     global CURRENT_USERS
     global USERNAMES
     client.send('SUCCESS'.encode('utf-8'))
     CURRENT_USERS.append(client)
     USERNAMES.append(username)
-    t_lock.notify()
+    log_connection(username, addr)
 
 def client_handler(client, addr):
     """ handles client interactions after receiving a connection """
@@ -164,7 +172,7 @@ def client_handler(client, addr):
     client_ip = addr[0]
     client_port = addr[1]
     try:
-        login_status = prompt_login(client)
+        login_status = prompt_login(client, addr)
         if login_status[0]:
             prompt_commands(client, login_status[1])
         else:

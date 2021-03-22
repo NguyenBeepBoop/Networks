@@ -13,7 +13,6 @@ IP = 'localhost'
 timeout = False
 t_lock=threading.Condition()
 block_time = 10
-message = ""
 CURRENT_USERS = []
 
 USERNAMES = []
@@ -69,9 +68,10 @@ def populate_logins():
 
 def broadcast(message):
     global CURRENT_USERS
+    print(message)
     """ function to broadcast message to all users """
     for client in CURRENT_USERS:
-        client.send(message.encode())
+        client.send(message)
 
 def send_message(client, username):
     """ send the message to online users """
@@ -98,7 +98,6 @@ def unblock(username):
 
 def prompt_commands(client, username):
     """ prompt commands to user """
-    global message
     while True:
         try:
             client.send('PROMPT_COMMANDS'.encode('utf-8'))
@@ -106,10 +105,10 @@ def prompt_commands(client, username):
             message = message.split(maxsplit=1)
             command = message[0]
             if command == 'MSG':
-                message = message[1]
-                broadcast(message)
+                broadcastMessage = message[1]
+                broadcast(broadcastMessage.encode('utf-8'))
             else:
-                client.send('INVALID_COMMAND')
+                client.send('INVALID_COMMAND'.encode())
         except:
             print(f'[CONNECTION] {username} has disconnected')
             client_exit(client, username)
@@ -190,7 +189,6 @@ def send_handler():
     global t_lock
     global CURRENT_USERS
     global serverSocket
-    global message
     while True:
         # get lock
         with t_lock:

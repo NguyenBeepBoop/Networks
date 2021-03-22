@@ -26,7 +26,7 @@ message = ""
 def keyboard_interrupt_handler(signal, frame):
     print("\r[SHUTDOWN] Connection to server has been closed.")
     clientSocket.close()
-    exit(0)
+    sys.exit(1)
 
 def recv_handler():
     global clientSocket

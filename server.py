@@ -120,7 +120,7 @@ def prompt_commands(client, username):
         except:
             print(f'[CONNECTION] {username} has disconnected')
             client_exit(client, username)
-            broadcast('{username} has left the chat!'.encode('utf-8'))
+            broadcast(f'{username} has left the chat!'.encode('utf-8'))
             break
 
 def prompt_login(client, addr):
@@ -136,19 +136,24 @@ def prompt_login(client, addr):
                 break
             else:
                 client.send('INVALID_USERNAME'.encode('utf-8'))
-        login_attempts = 1
+        login_attempts = 0
         while login_attempts < ATTEMPTS:
             password = client.recv(1024).decode()
             if is_blocked(username):
                     client.send('BLOCKED'.encode('utf-8'))
                     client.close()
-            if logins[username] != password:  
-                client.send('INCORRECT_PASSWORD'.encode('utf-8'))
-                login_attempts += 1
+                    break
+            if logins[username] != password:
+                if login_attempts == 2:
+                    break
+                else:
+                    client.send('INCORRECT_PASSWORD'.encode('utf-8'))
+                    login_attempts += 1
             elif logins[username] == password:
                 if username in USERNAMES:
                     client.send('ALREADY_LOGGED'.encode('utf-8'))
                     client.close()
+                    break
                 else:
                     login(client, username, addr)
                     return (True, username)

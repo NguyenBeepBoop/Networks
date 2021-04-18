@@ -15,26 +15,6 @@ import re
 CLIENTS = []
 USERS = []
 UPDATE_INTERVAL = 1
-IP = 'localhost'
-block_time=10
-t_lock=threading.Condition()
-# Get the server port and attempts allowed for login
-try:
-    PORT = int(sys.argv[1])
-    ATTEMPTS = int(sys.argv[2])
-    if PORT < 1024:
-        print("Port number must be greater than 1024!")
-        sys.exit(1)
-    elif ATTEMPTS > 5 or ATTEMPTS < 1:
-        print("Attempts must be between 1 and 5!")
-        sys.exit(1)
-except:
-    print("Usage: Python3 server.py <PORT> <ATTEMPTS>")
-    sys.exit(1)
-
-serverSocket = socket(AF_INET, SOCK_STREAM)
-serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-serverSocket.bind((IP, PORT))
 
 def client_exit(client, user):
     """ close the connection to the client and remove the client from current users """
@@ -44,6 +24,7 @@ def client_exit(client, user):
     with t_lock:
         CLIENTS.remove(client)
         USERS.remove(user)
+        auth.write_users(USERS)
         print(f'> {user.getUsername()} logout')
         client.send(json.dumps({
                 'command': 'OUT',
@@ -58,13 +39,32 @@ def keyboard_interrupt_handler(signal, frame):
     sys.exit(0)
 
 def getUsernames():
+    """ returns a list of active usernames """
     global USERS
     res=[]
     for user in USERS:
         res.append(user.getUsername())
     return res
+                                                                                               
+def getStatus(username):
+    """ returns active status of user given a username """
+    global USERS
+    for user in USERS:
+        if user.getUsername() == username:
+            return True
+    return False
+
+def getAddress(username):
+    """ returns port of a user given a username """
+    global USERS
+    for user in USERS:
+        if user.getUsername() == username:
+            return (user.getAddr(), user.getPort())
+    return None
 
 def getActiveUsersList(username):
+    """ returns a formatted list of active users containing addresses"""
+    global USERS
     res = []
     for user in USERS:
         if user.getUsername() != username:
@@ -109,7 +109,7 @@ def prompt_commands(client, user):
                     if len(data) != 2:
                         client.send(json.dumps({
                             'command': 'PRINT',
-                            'message': "MSG: error: Invalid Message!"
+                            'message': 'MSG: error: Invalid Message!'
                         }).encode("utf-8"))
                     else: # otherwise log the message to the server if the message format is valid
                         res = message.log_message(data[1], user.getUsername())
@@ -130,7 +130,7 @@ def prompt_commands(client, user):
                     if len(messageInfo) < 6:
                         client.send(json.dumps({
                                     'command': 'PRINT',
-                                    'message': "usage: EDT <messageNumber> <dateTime> <newMessage>"
+                                    'message': 'usage: EDT <messageNumber> <dateTime> <newMessage>'
                                 }).encode("utf-8"))
                     else:
                         messageNumber = int(re.findall('\d+',messageInfo[0])[0])
@@ -147,7 +147,7 @@ def prompt_commands(client, user):
                     if len(messageInfo) < 2:
                         client.send(json.dumps({
                                     'command': 'PRINT',
-                                    'message': "usage: DLT <messageNumber> <dateTime>"
+                                    'message': 'usage: DLT <messageNumber> <dateTime>'
                                 }).encode("utf-8"))
                     else:
                         messageNumber = int(re.findall('\d+',messageInfo[0])[0])
@@ -162,21 +162,21 @@ def prompt_commands(client, user):
                     if len(data) < 2:
                         client.send(json.dumps({
                                     'command': 'PRINT',
-                                    'message': "RDM: error: Please specify a date to read from."
+                                    'message': 'RDM: error: Please specify a date to read from.'
                                 }).encode("utf-8"))
                     else:
                         date=data[1]
                         res=message.get_messages(date, user.getUsername())
                         if res:
                             client.send(json.dumps({
-                                    'command': 'RDM',
-                                    'message': res
-                                }).encode("utf-8"))
+                                        'command': 'RDM',
+                                        'message': res
+                                    }).encode("utf-8"))
                         else:
                             client.send(json.dumps({
-                                    'command': 'PRINT',
-                                    'message': "No new message."
-                                }).encode("utf-8"))
+                                        'command': 'PRINT',
+                                        'message': 'No new messages.'
+                                    }).encode("utf-8"))
                 elif command == 'ATU':
                     # print message to show server has received ATU request
                     print(f"> {user.getUsername()} issued ATU command ATU.")
@@ -192,10 +192,33 @@ def prompt_commands(client, user):
                     else:
                         client.send(json.dumps({
                                     'command': 'PRINT',
-                                    'message': "No other active users."
+                                    'message': 'No other active users.'
                                 }).encode("utf-8"))
                 elif command == 'UPD':
-                    continue
+                    messageInfo = data[1].split()
+                    if len(messageInfo) < 2:
+                        client.send(json.dumps({
+                                    'command': 'PRINT',
+                                    'message': 'UPD: usage: UPD <targetUser> <fileName>'
+                                }).encode("utf-8"))
+                    else:
+                        targetUser = messageInfo[0]
+                        fileName = messageInfo[1]
+                        # if the target user is online send the UDP port to the client
+                        if getStatus(targetUser):
+                            res = getAddress(targetUser)
+                            res = list(res)
+                            client.send(json.dumps({
+                                    'command': 'UPD',
+                                    'message': res,
+                                    'filename': fileName,
+                                    'username': targetUser
+                                    }).encode("utf-8"))
+                        else:
+                            client.send(json.dumps({
+                                    'command': 'PRINT',
+                                    'message': 'UPD: error: User is offline.'
+                                    }).encode("utf-8"))
                 elif command == 'OUT':
                     client_exit(client, user)
                     break
@@ -213,12 +236,15 @@ def client_handler(client, addr):
     global ATTEMPTS
     client_ip = addr[0]
     client_port = addr[1]
+    # try to log in the user connecting
     try:
         login_status = auth.prompt_login(client, addr, ATTEMPTS, getUsernames())
         if login_status[0]:
             user = login(client, login_status[1], client_ip, client_port)
+            # start prompting commands if login successful
             prompt_commands(client, user)
         else:
+            # otherwise block the account that is being logged into
             client.send('BLOCK_LOGIN'.encode('utf-8'))
             auth.block(login_status[1], client, client_ip, client_port)
             threading.Timer(block_time, auth.unblock, [login_status[1]]).start()
@@ -236,16 +262,44 @@ def recv_handler():
         client_thread = threading.Thread(target=client_handler, args=(client, addr))
         client_thread.start()
 
-print("[STARTING] server is starting...")
+if __name__ == "__main__":
+    # get the real local ip address for server
+    s = socket(AF_INET, SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    IP = s.getsockname()[0]
+    s.close()
 
-serverSocket.listen(1)
-print("[READY] Server is ready for service")
-print("Running on http://127.0.0.1:" + str(PORT) + "/")
-recv_thread = threading.Thread(name="RecvHandler", target=recv_handler)
-recv_thread.daemon = True
-recv_thread.start()
+    block_time=10
+    t_lock=threading.Condition()
 
-signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+    # Get the server port and attempts allowed for login
+    try:
+        PORT = int(sys.argv[1])
+        ATTEMPTS = int(sys.argv[2])
+        if PORT < 1024:
+            print("Port number must be greater than 1024!")
+            sys.exit(1)
+        elif ATTEMPTS > 5 or ATTEMPTS < 1:
+            print("Attempts must be between 1 and 5!")
+            sys.exit(1)
+    except:
+        print("Usage: Python3 server.py <PORT> <ATTEMPTS>")
+        sys.exit(1)
 
-while True:
-    time.sleep(0.1)
+    serverSocket = socket(AF_INET, SOCK_STREAM)
+    serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+    serverSocket.bind((IP, PORT))
+
+    print("[STARTING] server is starting...")
+
+    serverSocket.listen(1)
+    print("[READY] Server is ready for service")
+    print(f"Running on http://{IP}:" + str(PORT) + "/")
+    recv_thread = threading.Thread(name="RecvHandler", target=recv_handler)
+    recv_thread.daemon = True
+    recv_thread.start()
+
+    signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+
+    while True:
+        time.sleep(0.1)

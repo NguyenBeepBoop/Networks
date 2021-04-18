@@ -47,8 +47,10 @@ def delete_message(messageNumber, dt, username):
         write_messages()
         return (True, f"message #{messageNumber} deleted at {dt}.")
     else:
+        dt = datetime.now().strftime("%d %b %Y %H:%M:%S")
         errorMessage=""
         if message['user'] != username:
+            print(f"> {username} attempts to delete MSG #{messageNumber} at {dt}. Authorisation fails.")
             errorMessage=f"Unauthorised to delete Message #{messageNumber}."
         else:
             errorMessage="Message Number and DateTime combination does not exist."
@@ -78,6 +80,8 @@ def edit_message(messageNumber, dt, newMessage, username):
     else:
         errorMessage=""
         if message['user'] != username:
+            dt = datetime.now().strftime("%d %b %Y %H:%M:%S")
+            print(f"> {username} attempts to edit MSG #{messageNumber} at {dt}. Authorisation fails.")
             errorMessage=f"Unauthorised to edit Message #{messageNumber}."
         else:
             errorMessage="Message Number and DateTime combination does not exist."

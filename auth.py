@@ -2,6 +2,7 @@
 # Python --Version 3.9.1
 import sys
 import datetime
+import user
 BLOCKED_CLIENTS = {}
 block_time = 10
 
@@ -17,11 +18,9 @@ def populate_logins():
     file.close()
     return user_logins
 
-logins = populate_logins()
-userlog = open("userlog.txt", 'w')
-
 # function to log interactions
 def log_connection(username, addr, port, index):
+    """ writes to userlog file given user data """
     global userlog
     dt = datetime.datetime.now().strftime("%d %b %Y %H:%M:%S")
     userlog.write(f"{index}; {dt}; {username}; {addr}; {port};\n")
@@ -49,6 +48,7 @@ def unblock(username):
 def prompt_login(client, addr, ATTEMPTS, USERNAMES):
     """" prompt user to login """
     global logins
+    # get the username of the client
     while True:
         username = client.recv(1024).decode('utf-8')
         if username in logins:
@@ -57,6 +57,7 @@ def prompt_login(client, addr, ATTEMPTS, USERNAMES):
         else:
             client.send('INVALID_USERNAME'.encode('utf-8'))
     login_attempts = 0
+    # attempt to log the client in 
     while login_attempts < ATTEMPTS:
         password = client.recv(1024).decode()
         if is_blocked(username):
@@ -80,4 +81,14 @@ def prompt_login(client, addr, ATTEMPTS, USERNAMES):
                 return (True, username)
     return (False, username)
 
+def write_users(USERS):
+    global userlog
+    userlog.seek(0)
+    userlog.truncate()
+    for user in USERS:
+        index = USERS.index(user) + 1
+        userlog.write(f'{index}; {user.getLastActive()}; {user.getUsername()}; {user.getAddr()}; {user.getPort()};\n')
+    userlog.flush()
+
 logins = populate_logins()
+userlog = open("userlog.txt", 'w')
